@@ -9,8 +9,7 @@ import org.bukkit.event.inventory.InventoryCloseEvent
 import org.bukkit.inventory.ItemStack
 import org.bukkit.scheduler.BukkitRunnable
 
-open class Minesweeper(p : Player) : ArrayInventory("지뢰찾기",6) {
-    val player = p
+open class Minesweeper(val player : Player,val level:Int) : ArrayInventory("지뢰찾기",6) {
 
     val landMines : ArrayList<Int> = arrayListOf()
 
@@ -20,6 +19,9 @@ open class Minesweeper(p : Player) : ArrayInventory("지뢰찾기",6) {
 
     var isFail = false
     var isGameover = false
+
+    var startTime = 0L
+
     init {
         var meta = landMine.itemMeta
         meta.displayName = "§c지뢰"
@@ -40,7 +42,7 @@ open class Minesweeper(p : Player) : ArrayInventory("지뢰찾기",6) {
 
     fun start() {
         player.openInventory(inventory)
-
+        startTime = System.currentTimeMillis()
         object : BukkitRunnable() {
             override fun run() {
                 if(isGameover){
@@ -54,15 +56,13 @@ open class Minesweeper(p : Player) : ArrayInventory("지뢰찾기",6) {
     }
 
     private fun creation(){
-        for(i in 0 until line){
-            val a = rand(0,8)
-            landMines.add(yxtoslot(i,a))
-            println("$i $a ${yxtoslot(i,a)}")
+        for(i in 1 .. (level * 3)){
+            val a = rand(0,maxSlot)
+            if(!landMines.contains(a))landMines.add(a)
         }
         for (i in 0 .. maxSlot){
             inventory.setItem(i,glass)
         }
-
     }
 
     @EventHandler
@@ -78,12 +78,15 @@ open class Minesweeper(p : Player) : ArrayInventory("지뢰찾기",6) {
             inventory.setItem(event.slot,glass)
             return
         }
-
-        if(landMines.contains(event.slot)){
-            //지뢰 누름
-            if (event.isLeftClick){
-                //지뢰를 떠뜨림
-                isFail = true
+        if(event.isRightClick){
+            if(event.currentItem.isSimilar(glass)){
+                inventory.setItem(event.slot,flag)
+            }
+            return
+        }
+        if(landMines.contains(event.slot)){ //지뢰를 누르면
+            if (event.isLeftClick){ // 지뢰를 터뜨리면
+                isFail = true //실패
                 inventory.setItem(event.slot,landMine)
 
                 object : BukkitRunnable() {
@@ -91,7 +94,7 @@ open class Minesweeper(p : Player) : ArrayInventory("지뢰찾기",6) {
                     override fun run() {
                         if(index >= landMines.size){
                             cancel();
-                            player.sendMessage("Los1e")
+                            player.sendMessage("Lose")
                             isGameover = true
                             return
                         }
@@ -100,26 +103,19 @@ open class Minesweeper(p : Player) : ArrayInventory("지뢰찾기",6) {
                     }
                 }.runTaskTimer(MinesweeperPlugin.Instance,5,5)
             }
-        }
-        if(event.isRightClick){
-            if(event.currentItem.isSimilar(glass)){
-                inventory.setItem(event.slot,flag)
-            }
             return
         }
 
         remove(event.slot / 9,((event.slot - (event.slot / 9 ) * 9) ) % 9)
-
         for (i in 0 .. maxSlot){
-            if(inventory.getItem(i)?.isSimilar(glass) == true){
-                if(!landMines.contains(i))return
-            }
-            if(inventory.getItem(i)?.isSimilar(flag) == true){
-                if(!landMines.contains(i))return
-            }
+            if(inventory.getItem(i)?.isSimilar(glass) == true){ if(!landMines.contains(i))return }
+            if(inventory.getItem(i)?.isSimilar(flag) == true){ if(!landMines.contains(i))return }
         }
 
         isFail = true
+
+
+
         object : BukkitRunnable() {
             var index = 0
             override fun run() {
